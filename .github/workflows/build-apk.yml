@@ -1,0 +1,53 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 取得程式碼
+        uses: actions/checkout@v4
+
+      - name: 安裝 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 安裝 Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: 準備網頁檔案
+        run: |
+          mkdir -p app/www
+          cp -r index.html assets data thumbs app/www/
+          # 手機版不用本地原圖，並關閉原作者的流量統計
+          cat > app/www/config.js <<'EOF'
+          window.LOCAL_ORIGINALS = { face: "", pose: "", costume: "" };
+          window.ANALYTICS = { providers: [] };
+          EOF
+
+      - name: 建立 Android 專案
+        working-directory: app
+        run: |
+          npm init -y
+          npm install @capacitor/core@8 @capacitor/cli@8 @capacitor/android@8
+          npx cap init "AI作圖素材庫" com.personal.airef --web-dir www
+          npx cap add android
+
+      - name: 編譯 APK
+        working-directory: app/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: 上傳 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-ref-library-apk
+          path: app/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
