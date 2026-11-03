@@ -25,17 +25,24 @@ jobs:
         run: |
           mkdir -p app/www
           cp -r index.html assets data thumbs app/www/
+          cp android/chatgpt-share.js app/www/
+          # 固定簽章：以後的新版才能直接覆蓋安裝
+          mkdir -p ~/.android && cp android/debug.keystore ~/.android/debug.keystore
           # 手機版不用本地原圖，並關閉原作者的流量統計
           cat > app/www/config.js <<'EOF'
           window.LOCAL_ORIGINALS = { face: "", pose: "", costume: "" };
           window.ANALYTICS = { providers: [] };
           EOF
+          # 讓「傳到 ChatGPT」按鈕取得目前抽到的組合（不改動原作者的檔案，只改打包用的副本）
+          sed -i 's/^switchLib("combo");$/window.__AIREF = { comboParts: comboParts };\nswitchLib("combo");/' app/www/assets/app.js
+          grep -q "window.__AIREF" app/www/assets/app.js || echo "::warning::原作者的 app.js 結構變了，ChatGPT 按鈕會顯示「不支援」"
+          sed -i 's#</body>#<script src="chatgpt-share.js"></script>\n</body>#' app/www/index.html
 
       - name: 建立 Android 專案
         working-directory: app
         run: |
           npm init -y
-          npm install @capacitor/core@8 @capacitor/cli@8 @capacitor/android@8
+          npm install @capacitor/core@8 @capacitor/cli@8 @capacitor/android@8 @capacitor/share@8 @capacitor/filesystem@8 @capacitor/clipboard@8
           npx cap init "AI作圖素材庫" com.personal.airef --web-dir www
           npx cap add android
 
